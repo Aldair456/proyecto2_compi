@@ -11,7 +11,6 @@ enum class TokenType {
     INT, FLOAT, LONG, UNSIGNED,
     IF, ELSE, WHILE, FOR, RETURN,
     PRINTF, INCLUDE,
-    
     // Operadores aritméticos
     PLUS, MINUS, MULTIPLY, DIVIDE, MODULO,
     

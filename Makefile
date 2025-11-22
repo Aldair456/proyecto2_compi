@@ -10,7 +10,7 @@ OBJ_DIR = obj
 SOURCES = main.cpp \
           scanner/token.cpp scanner/scanner.cpp \
           parser/ast.cpp parser/parser.cpp \
-          visitors/codegen.cpp
+          visitors/codegen.cpp visitors/optimizer.cpp
 
 # Archivos objeto
 OBJECTS = $(SOURCES:.cpp=.o)

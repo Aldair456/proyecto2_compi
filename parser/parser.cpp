@@ -276,17 +276,16 @@ unique_ptr<Stmt> Parser::whileStatement() {
     
     return make_unique<WhileStmt>(move(condition), move(body));
 }
-
 unique_ptr<Stmt> Parser::forStatement() {
     consume(TokenType::LPAREN, "Expected '(' after 'for'.");
-    
-    // Initializer: int i = 0
+
+    // Initializer: int i = 0 o i = 0
     unique_ptr<Stmt> initializer = nullptr;
     if (match({TokenType::INT, TokenType::FLOAT, TokenType::LONG, TokenType::UNSIGNED})) {
         Token typeToken = previous();
         DataType type = tokenToDataType(typeToken);
         Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
-        
+
         unique_ptr<Expr> init = nullptr;
         if (match({TokenType::ASSIGN})) {
             init = expression();
@@ -298,23 +297,23 @@ unique_ptr<Stmt> Parser::forStatement() {
     } else {
         advance(); // Consume ';'
     }
-    
+
     // Condition: i < 10
     unique_ptr<Expr> condition = nullptr;
     if (!check(TokenType::SEMICOLON)) {
         condition = expression();
     }
     consume(TokenType::SEMICOLON, "Expected ';' after for condition.");
-    
-    // Increment: i++ o i = i + 1
+
+    // Increment: i++ (expresión normal)
     unique_ptr<Expr> increment = nullptr;
     if (!check(TokenType::RPAREN)) {
         increment = expression();
     }
     consume(TokenType::RPAREN, "Expected ')' after for clauses.");
-    
+
     unique_ptr<Stmt> body = statement();
-    
+
     return make_unique<ForStmt>(move(initializer), move(condition), move(increment), move(body));
 }
 
