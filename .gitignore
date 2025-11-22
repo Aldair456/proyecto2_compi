@@ -1,0 +1,47 @@
+# Ejecutables
+compiler
+program
+*.exe
+*.out
+
+# Archivos objeto
+*.o
+*.obj
+
+# Archivos ensamblador generados
+output.asm
+*.asm
+
+# Archivos de compilación
+*.d
+*.so
+*.a
+*.lib
+
+# Directorios de build
+obj/
+build/
+bin/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDEs y editores
+.vscode/
+.idea/
+*.sublime-*
+.vs/
+
+# Archivos de depuración
+*.log
+*.dSYM/
+
+# Archivos temporales de tests
+tests/**/*.asm
+tests/**/*.o
+tests/**/program
+
