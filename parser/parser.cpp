@@ -346,7 +346,50 @@ unique_ptr<Expr> Parser::expression() {
 }
 
 unique_ptr<Expr> Parser::assignment() {
-    return ternary();
+    // Primero intentar parsear una expresión de menor precedencia
+    unique_ptr<Expr> expr = ternary();
+    
+    // Si encontramos un ASSIGN, entonces es una asignación
+    // En C, las asignaciones son expresiones que retornan el valor asignado
+    if (match({TokenType::ASSIGN, TokenType::PLUSEQ, TokenType::MINUSEQ})) {
+        Token op = previous();
+        unique_ptr<Expr> value = assignment(); // Asociatividad a la derecha
+        
+        // Verificar que el lado izquierdo es una variable
+        Variable* var = dynamic_cast<Variable*>(expr.get());
+        if (!var) {
+            error("Left side of assignment must be a variable.");
+            throw runtime_error("Left side of assignment must be a variable.");
+        }
+        
+        // Manejar += y -=
+        if (op.type == TokenType::PLUSEQ) {
+            value = make_unique<BinaryOp>(
+                make_unique<Variable>(var->name),
+                Token(TokenType::PLUS, "+", op.line, op.column),
+                move(value)
+            );
+        } else if (op.type == TokenType::MINUSEQ) {
+            value = make_unique<BinaryOp>(
+                make_unique<Variable>(var->name),
+                Token(TokenType::MINUS, "-", op.line, op.column),
+                move(value)
+            );
+        }
+        
+        // Crear una expresión de asignación que retorna el valor asignado
+        return make_unique<AssignExpr>(var->name, move(value));
+    }
+    
+    // Verificar si es asignación a array: arr[i] = expr
+    if (ArrayAccess* arrAccess = dynamic_cast<ArrayAccess*>(expr.get())) {
+        if (match({TokenType::ASSIGN})) {
+            unique_ptr<Expr> value = assignment();
+            return make_unique<AssignExpr>(arrAccess->arrayName, move(arrAccess->indices), move(value));
+        }
+    }
+    
+    return expr;
 }
 
 unique_ptr<Expr> Parser::ternary() {

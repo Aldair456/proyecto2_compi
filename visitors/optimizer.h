@@ -8,6 +8,7 @@
 #include "../parser/ast.h"
 #include <map>
 #include <memory>
+#include <set>
 
 using namespace std;
 
@@ -48,6 +49,16 @@ private:
 
     // Optimiza un bloque de código (lista de statements)
     void optimizeBlock(Block* block);
+
+    // ========== DEAD STORE ELIMINATION ==========
+    // Elimina escrituras muertas (variables que se sobrescriben sin leerse)
+    void eliminateDeadStores(Block* block);
+    
+    // Helper: Obtiene todas las variables leídas en una expresión
+    void getReadVariables(Expr* expr, set<string>& variables);
+    
+    // Helper: Obtiene todas las variables leídas en un statement
+    void getReadVariablesInStmt(Stmt* stmt, set<string>& variables);
 
     // ========== HELPER FUNCTIONS ==========
 

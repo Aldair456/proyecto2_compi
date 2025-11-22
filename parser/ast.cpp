@@ -108,6 +108,17 @@ void ArrayAccess::accept(Visitor* visitor) {
     visitor->visitArrayAccess(this);
 }
 
+// AssignExpr
+AssignExpr::AssignExpr(string varName, unique_ptr<Expr> value)
+    : varName(varName), value(move(value)), isArrayAssign(false) {}
+
+AssignExpr::AssignExpr(string varName, vector<unique_ptr<Expr>> indices, unique_ptr<Expr> value)
+    : varName(varName), indices(move(indices)), value(move(value)), isArrayAssign(true) {}
+
+void AssignExpr::accept(Visitor* visitor) {
+    visitor->visitAssignExpr(this);
+}
+
 // ========== STATEMENTS ==========
 
 // VarDecl (simple)

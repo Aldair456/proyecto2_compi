@@ -195,6 +195,9 @@ void Optimizer::optimizeBlock(Block* block) {
 
     // Reemplazar los statements del bloque con los optimizados
     block->statements = move(optimizedStmts);
+    
+    // DEAD STORE ELIMINATION: Eliminar escrituras muertas
+    eliminateDeadStores(block);
 }
 // ========== OPTIMIZAR EXPRESIONES ==========
 // Recibe cualquier expresión y la optimiza según su tipo
@@ -297,6 +300,32 @@ unique_ptr<Expr> Optimizer::optimizeExpr(Expr* expr) {
         }
 
         return make_unique<ArrayAccess>(arrAccess->arrayName, move(optimizedIndices));
+    }
+
+    // ¿Es una asignación como expresión? (i = i + 1)
+    else if (AssignExpr* assignExpr = dynamic_cast<AssignExpr*>(expr)) {
+        // Optimizar el valor
+        auto optimizedValue = optimizeExpr(assignExpr->value.get());
+        
+        // Constant propagation: si el valor es constante, registrarlo
+        int value;
+        if (isIntLiteral(optimizedValue.get(), value)) {
+            constantValues[assignExpr->varName] = value;
+        } else {
+            // Si la variable se reasigna con un valor no constante, eliminarla
+            constantValues.erase(assignExpr->varName);
+        }
+        
+        if (assignExpr->isArrayAssign) {
+            // Optimizar índices
+            vector<unique_ptr<Expr>> optimizedIndices;
+            for (auto& index : assignExpr->indices) {
+                optimizedIndices.push_back(optimizeExpr(index.get()));
+            }
+            return make_unique<AssignExpr>(assignExpr->varName, move(optimizedIndices), move(optimizedValue));
+        } else {
+            return make_unique<AssignExpr>(assignExpr->varName, move(optimizedValue));
+        }
     }
 
     // Si no reconocemos el tipo, devolver nullptr
@@ -519,8 +548,8 @@ bool Optimizer::tryUnrollLoop(ForStmt* forStmt, vector<unique_ptr<Stmt>>& output
     // 3. Verificar incremento: i = i + 1
     if (!forStmt->increment) return false;
 
-    // El incremento puede estar como ExprStmt que contiene una expresión
-    AssignStmt* incAssign = dynamic_cast<AssignStmt*>(forStmt->increment.get());
+    // El incremento es una expresión (AssignExpr)
+    AssignExpr* incAssign = dynamic_cast<AssignExpr*>(forStmt->increment.get());
 
     if (!incAssign || incAssign->varName != loopVar) return false;
 
@@ -670,5 +699,167 @@ unique_ptr<Expr> Optimizer::cloneExpr(Expr* expr) {
         }
     }
 
+    // AssignExpr
+    if (AssignExpr* assignExpr = dynamic_cast<AssignExpr*>(expr)) {
+        if (assignExpr->isArrayAssign) {
+            vector<unique_ptr<Expr>> clonedIndices;
+            for (auto& index : assignExpr->indices) {
+                clonedIndices.push_back(cloneExpr(index.get()));
+            }
+            return make_unique<AssignExpr>(
+                assignExpr->varName,
+                move(clonedIndices),
+                cloneExpr(assignExpr->value.get())
+            );
+        } else {
+            return make_unique<AssignExpr>(
+                assignExpr->varName,
+                cloneExpr(assignExpr->value.get())
+            );
+        }
+    }
+
     return nullptr;
+}
+
+// ========== DEAD STORE ELIMINATION ==========
+void Optimizer::eliminateDeadStores(Block* block) {
+    // Analizar de atrás hacia adelante
+    set<string> liveVars;  // Variables que se leen después
+    vector<bool> isDead(block->statements.size(), false);
+    
+    // Recorrer de atrás hacia adelante
+    for (int i = block->statements.size() - 1; i >= 0; i--) {
+        Stmt* stmt = block->statements[i].get();
+        
+        // Si es un assignment
+        if (AssignStmt* assign = dynamic_cast<AssignStmt*>(stmt)) {
+            // Si la variable NO se lee después, es una escritura muerta
+            if (liveVars.find(assign->varName) == liveVars.end()) {
+                isDead[i] = true;
+                cout << "    Dead store eliminated: " << assign->varName << endl;
+            } else {
+                // Se lee después, es necesaria
+                // Remover de liveVars (ya encontramos la escritura)
+                liveVars.erase(assign->varName);
+            }
+            
+            // Agregar variables leídas en el lado derecho
+            getReadVariables(assign->value.get(), liveVars);
+        }
+        
+        // Si es un VarDecl con inicializador
+        else if (VarDecl* varDecl = dynamic_cast<VarDecl*>(stmt)) {
+            if (varDecl->initializer) {
+                // Si la variable NO se lee después, la inicialización es muerta
+                if (liveVars.find(varDecl->name) == liveVars.end()) {
+                    // No podemos eliminar la declaración, pero sí el inicializador
+                    cout << "    Dead initialization: " << varDecl->name << endl;
+                    varDecl->initializer = nullptr;
+                } else {
+                    liveVars.erase(varDecl->name);
+                    getReadVariables(varDecl->initializer.get(), liveVars);
+                }
+            }
+        }
+        
+        // Para cualquier otro statement, obtener variables leídas
+        else {
+            getReadVariablesInStmt(stmt, liveVars);
+        }
+    }
+    
+    // Eliminar statements marcados como muertos
+    vector<unique_ptr<Stmt>> aliveStmts;
+    for (size_t i = 0; i < block->statements.size(); i++) {
+        if (!isDead[i]) {
+            aliveStmts.push_back(move(block->statements[i]));
+        }
+    }
+    
+    block->statements = move(aliveStmts);
+}
+
+// Helper: Obtiene variables leídas en una expresión
+void Optimizer::getReadVariables(Expr* expr, set<string>& variables) {
+    if (!expr) return;
+    
+    if (Variable* var = dynamic_cast<Variable*>(expr)) {
+        variables.insert(var->name);
+    }
+    else if (BinaryOp* binOp = dynamic_cast<BinaryOp*>(expr)) {
+        getReadVariables(binOp->left.get(), variables);
+        getReadVariables(binOp->right.get(), variables);
+    }
+    else if (UnaryOp* unOp = dynamic_cast<UnaryOp*>(expr)) {
+        getReadVariables(unOp->operand.get(), variables);
+    }
+    else if (CallExpr* call = dynamic_cast<CallExpr*>(expr)) {
+        for (auto& arg : call->arguments) {
+            getReadVariables(arg.get(), variables);
+        }
+    }
+    else if (ArrayAccess* arrAccess = dynamic_cast<ArrayAccess*>(expr)) {
+        variables.insert(arrAccess->arrayName);
+        for (auto& index : arrAccess->indices) {
+            getReadVariables(index.get(), variables);
+        }
+    }
+    else if (TernaryExpr* ternary = dynamic_cast<TernaryExpr*>(expr)) {
+        getReadVariables(ternary->condition.get(), variables);
+        getReadVariables(ternary->exprTrue.get(), variables);
+        getReadVariables(ternary->exprFalse.get(), variables);
+    }
+    else if (CastExpr* cast = dynamic_cast<CastExpr*>(expr)) {
+        getReadVariables(cast->expr.get(), variables);
+    }
+    else if (AssignExpr* assignExpr = dynamic_cast<AssignExpr*>(expr)) {
+        // En una asignación como expresión, solo leemos las variables del lado derecho
+        getReadVariables(assignExpr->value.get(), variables);
+        // También leemos los índices si es array
+        for (auto& index : assignExpr->indices) {
+            getReadVariables(index.get(), variables);
+        }
+    }
+}
+
+// Helper: Obtiene variables leídas en un statement
+void Optimizer::getReadVariablesInStmt(Stmt* stmt, set<string>& variables) {
+    if (!stmt) return;
+    
+    if (ExprStmt* exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
+        getReadVariables(exprStmt->expression.get(), variables);
+    }
+    else if (ReturnStmt* retStmt = dynamic_cast<ReturnStmt*>(stmt)) {
+        if (retStmt->value) {
+            getReadVariables(retStmt->value.get(), variables);
+        }
+    }
+    else if (IfStmt* ifStmt = dynamic_cast<IfStmt*>(stmt)) {
+        getReadVariables(ifStmt->condition.get(), variables);
+        // También considerar variables leídas en las ramas
+        getReadVariablesInStmt(ifStmt->thenBranch.get(), variables);
+        if (ifStmt->elseBranch) {
+            getReadVariablesInStmt(ifStmt->elseBranch.get(), variables);
+        }
+    }
+    else if (WhileStmt* whileStmt = dynamic_cast<WhileStmt*>(stmt)) {
+        getReadVariables(whileStmt->condition.get(), variables);
+        getReadVariablesInStmt(whileStmt->body.get(), variables);
+    }
+    else if (ForStmt* forStmt = dynamic_cast<ForStmt*>(stmt)) {
+        if (forStmt->condition) {
+            getReadVariables(forStmt->condition.get(), variables);
+        }
+        if (forStmt->increment) {
+            getReadVariables(forStmt->increment.get(), variables);
+        }
+        getReadVariablesInStmt(forStmt->body.get(), variables);
+    }
+    else if (Block* block = dynamic_cast<Block*>(stmt)) {
+        // Recorrer recursivamente el bloque
+        for (auto& s : block->statements) {
+            getReadVariablesInStmt(s.get(), variables);
+        }
+    }
 }

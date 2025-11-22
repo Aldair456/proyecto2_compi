@@ -140,6 +140,19 @@ public:
     void accept(Visitor* visitor) override;
 };
 
+// Asignación como expresión: i = i + 1 (retorna el valor asignado)
+class AssignExpr : public Expr {
+public:
+    string varName;
+    unique_ptr<Expr> value;
+    bool isArrayAssign;
+    vector<unique_ptr<Expr>> indices;
+    
+    AssignExpr(string varName, unique_ptr<Expr> value);
+    AssignExpr(string varName, vector<unique_ptr<Expr>> indices, unique_ptr<Expr> value);
+    void accept(Visitor* visitor) override;
+};
+
 // ========== STATEMENTS ==========
 
 // Declaración de variable: int x; float y = 3.14;
@@ -274,6 +287,7 @@ public:
     virtual void visitTernaryExpr(TernaryExpr* node) = 0;
     virtual void visitCallExpr(CallExpr* node) = 0;
     virtual void visitArrayAccess(ArrayAccess* node) = 0;
+    virtual void visitAssignExpr(AssignExpr* node) = 0;
     
     // Statements
     virtual void visitVarDecl(VarDecl* node) = 0;

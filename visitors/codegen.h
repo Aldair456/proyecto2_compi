@@ -81,6 +81,7 @@ public:
     void visitTernaryExpr(TernaryExpr* node) override;
     void visitCallExpr(CallExpr* node) override;
     void visitArrayAccess(ArrayAccess* node) override;
+    void visitAssignExpr(AssignExpr* node) override;
     
     // Visitor methods - Statements
     void visitVarDecl(VarDecl* node) override;

@@ -553,6 +553,144 @@ void CodeGen::visitArrayAccess(ArrayAccess* node) {
     }
 }
 
+void CodeGen::visitAssignExpr(AssignExpr* node) {
+    if (node->isArrayAssign) {
+        // Asignación a array: arr[i] = value
+        // Similar a AssignStmt pero el resultado debe quedar en rax/xmm0
+        
+        // Evaluar valor primero
+        node->value->accept(this);
+        bool wasFloat = lastExprWasFloat;
+        
+        // Guardar valor temporalmente
+        if (wasFloat) {
+            emit("sub rsp, 8");
+            emit("movss [rsp], xmm0");
+        } else {
+            emit("push rax");
+        }
+        
+        // Calcular dirección del array (similar a visitArrayAccess)
+        VarInfo* varInfo = nullptr;
+        if (localVars.find(node->varName) != localVars.end()) {
+            varInfo = &localVars[node->varName];
+        }
+        
+        if (!varInfo) {
+            emit("add rsp, 8");  // Limpiar stack
+            return;
+        }
+        
+        if (node->indices.size() == 1) {
+            // Array 1D
+            node->indices[0]->accept(this);
+            
+            int typeSize = 4;
+            if (varInfo->type == DataType::LONG) typeSize = 8;
+            
+            emit("imul rax, " + to_string(typeSize));
+            emit("mov rbx, rbp");
+            emit("sub rbx, " + to_string(varInfo->offset));
+            emit("add rbx, rax");
+            
+            // Recuperar y almacenar valor
+            if (wasFloat) {
+                emit("movss xmm0, [rsp]");
+                emit("add rsp, 8");
+                emit("movss [rbx], xmm0");
+                lastExprWasFloat = true;
+            } else {
+                emit("pop rax");
+                if (varInfo->type == DataType::FLOAT) {
+                    emit("cvtsi2ss xmm0, rax");
+                    emit("movss [rbx], xmm0");
+                    lastExprWasFloat = true;
+                } else if (varInfo->type == DataType::LONG) {
+                    emit("mov [rbx], rax");
+                    lastExprWasFloat = false;
+                } else {
+                    emit("mov [rbx], eax");
+                    lastExprWasFloat = false;
+                }
+            }
+        } else if (node->indices.size() == 2) {
+            // Array 2D
+            node->indices[0]->accept(this);
+            emit("imul rax, " + to_string(varInfo->dimensions[1]));
+            emit("push rax");
+            
+            node->indices[1]->accept(this);
+            emit("pop rbx");
+            emit("add rax, rbx");
+            
+            int typeSize = 4;
+            if (varInfo->type == DataType::LONG) typeSize = 8;
+            
+            emit("imul rax, " + to_string(typeSize));
+            emit("mov rbx, rbp");
+            emit("sub rbx, " + to_string(varInfo->offset));
+            emit("add rbx, rax");
+            
+            // Recuperar y almacenar valor
+            if (wasFloat) {
+                emit("movss xmm0, [rsp]");
+                emit("add rsp, 8");
+                emit("movss [rbx], xmm0");
+                lastExprWasFloat = true;
+            } else {
+                emit("pop rax");
+                if (varInfo->type == DataType::FLOAT) {
+                    emit("cvtsi2ss xmm0, rax");
+                    emit("movss [rbx], xmm0");
+                    lastExprWasFloat = true;
+                } else if (varInfo->type == DataType::LONG) {
+                    emit("mov [rbx], rax");
+                    lastExprWasFloat = false;
+                } else {
+                    emit("mov [rbx], eax");
+                    lastExprWasFloat = false;
+                }
+            }
+        }
+        
+        // Cargar el valor de vuelta para que quede en rax/xmm0
+        if (varInfo->type == DataType::FLOAT) {
+            emit("movss xmm0, [rbx]");
+            lastExprWasFloat = true;
+        } else if (varInfo->type == DataType::LONG) {
+            emit("mov rax, [rbx]");
+            lastExprWasFloat = false;
+        } else {
+            emit("mov eax, [rbx]");
+            emit("movsx rax, eax");
+            lastExprWasFloat = false;
+        }
+    } else {
+        // Asignación simple: x = value
+        node->value->accept(this); // Value is in rax/xmm0
+        
+        if (localVars.find(node->varName) != localVars.end()) {
+            VarInfo& var = localVars[node->varName];
+            
+            if (var.type == DataType::FLOAT) {
+                emit("movss [rbp - " + to_string(var.offset) + "], xmm0");
+                // El valor ya está en xmm0
+                lastExprWasFloat = true;
+            } else if (var.type == DataType::LONG) {
+                emit("mov [rbp - " + to_string(var.offset) + "], rax");
+                // El valor ya está en rax
+                lastExprWasFloat = false;
+            } else {
+                emit("mov [rbp - " + to_string(var.offset) + "], eax");
+                // El valor ya está en rax (eax)
+                lastExprWasFloat = false;
+            }
+        }
+        // The result of an assignment expression is the value assigned
+        // So, rax/xmm0 already holds the correct value.
+    }
+}
+
 // ========== STATEMENTS ==========
 
 void CodeGen::visitVarDecl(VarDecl* node) {
