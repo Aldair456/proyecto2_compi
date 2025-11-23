@@ -1,0 +1,63 @@
+service: compiler-debugger
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: python3.12
+  region: us-east-1
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:*:*:*"
+
+functions:
+  compile:
+    handler: lambda/lambda_function.lambda_handler
+    description: Compila código C y genera assembly + debug.json + emulación x86-64
+    memorySize: 1536
+    timeout: 180
+    # ← QUITAR ESTAS LÍNEAS:
+    # layers:
+    #   - arn:aws:lambda:...
+    # environment:
+    #   PATH: ...
+    #   LD_LIBRARY_PATH: ...
+    events:
+      - http:
+          path: /compile
+          method: post
+          cors: true
+
+# Package configuration
+package:
+  individually: false
+  patterns:
+    - 'lambda/**'
+    - '../compiler'
+    - '!../*.cpp'
+    - '!../*.h'
+    - '!../*.hpp'
+    - '!../parser/**'
+    - '!../scanner/**'
+    - '!../visitors/**'
+    - '!../tests/**'
+    - '!../.idea/**'
+    - '!../cmake-build-debug/**'
+    - '!../*.exe'
+    - '!../*.o'
+    - '!../program*'
+    - '!../main.o'
+    - '!../output.*'
+    - '!../.git/**'
+    - '!../.serverless/**'
+    - '!*.zip'
+    - '!deploy.*'
+    - '!package.*'
+    - '!lambda-layer/**'  # ← AGREGAR ESTO

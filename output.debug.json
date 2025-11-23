@@ -1,0 +1,111 @@
+{
+  "sourceLines": [
+    "// Optimización 5: Loop unrolling",
+    "// El compilador puede \"desenrollar\" loops pequeños",
+    "#include <stdio.h>",
+    "",
+    "int main() {",
+    "    int sum;",
+    "    int i;",
+    "    ",
+    "    sum = 0;",
+    "    ",
+    "    for (i = 0; i < 4; i = i + 1) {",
+    "        sum = sum + i;",
+    "    }",
+    "    ",
+    "    printf(\"%d\\n\", sum);",
+    "    ",
+    "    return 0;",
+    "}",
+    ""
+  ],
+  "stackFrame": [
+  ],
+  "instructions": [
+    {
+      "id": 0,
+      "assembly": "push rbp",
+      "sourceLine": 5,
+      "line": 5
+    },
+    {
+      "id": 1,
+      "assembly": "mov rbp, rsp",
+      "sourceLine": 5,
+      "line": 5
+    },
+    {
+      "id": 2,
+      "assembly": "lea rax, [str_const_0]",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 3,
+      "assembly": "mov rdi, rax",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 4,
+      "assembly": "push rdi",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 5,
+      "assembly": "mov eax, 6",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 6,
+      "assembly": "mov rsi, rax",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 7,
+      "assembly": "pop rdi",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 8,
+      "assembly": "xor rax, rax",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 9,
+      "assembly": "call printf",
+      "sourceLine": 15,
+      "line": 15
+    },
+    {
+      "id": 10,
+      "assembly": "mov eax, 0",
+      "sourceLine": 17,
+      "line": 17
+    },
+    {
+      "id": 11,
+      "assembly": "mov rsp, rbp",
+      "sourceLine": 17,
+      "line": 17
+    },
+    {
+      "id": 12,
+      "assembly": "pop rbp",
+      "sourceLine": 17,
+      "line": 17
+    },
+    {
+      "id": 13,
+      "assembly": "ret",
+      "sourceLine": 17,
+      "line": 17
+    }
+  ]
+}

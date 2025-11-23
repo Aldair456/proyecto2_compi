@@ -1,0 +1,20 @@
+# Serverless Framework
+.serverless/
+*.zip
+
+# Lambda layers
+lambda-layer/
+compiler-tools-layer.zip
+
+# Builds
+*.pyc
+__pycache__/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,21 @@
+# Archivos temporales
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Compilador (no incluir en git)
+compiler
+compiler.exe
+
+# Archivos de test
+test_output/
+*.asm
+*.debug.json
+*.o
+
+# AWS
+.aws-sam/
+samconfig.toml
+
