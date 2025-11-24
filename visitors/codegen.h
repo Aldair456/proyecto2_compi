@@ -8,6 +8,7 @@
 #include <vector>
 #include <sstream>
 #include <stack>
+#include <set>
 
 using namespace std;
 
@@ -34,6 +35,9 @@ private:
     map<string, VarInfo> localVars;     // Variables locales
     map<string, VarInfo> globalVars;    // Variables globales
     map<string, FunctionInfo> functions; // Funciones
+    
+    // Variables que no necesitan espacio en el stack (optimizadas a constantes)
+    set<string> optimizedVars;  // Variables que fueron optimizadas y no necesitan stack
     
     // Estado actual
     string currentFunction;
@@ -67,6 +71,12 @@ private:
     // Helpers para arrays
     void emitArrayAccess(string arrayName, vector<unique_ptr<Expr>>& indices);
     int calculateArrayOffset(vector<int>& dimensions, int dimIndex);
+    
+    // Helper para calcular tamaño del stack sin generar código
+    int calculateStackSize(FunctionDecl* node);
+    
+    // Helper para detectar variables optimizadas que no necesitan stack space
+    void detectOptimizedVars(FunctionDecl* node);
 
 public:
     CodeGen();

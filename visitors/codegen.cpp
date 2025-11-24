@@ -1,5 +1,7 @@
 #include "codegen.h"
 #include <iostream>
+#include <set>
+#include <functional>
 
 CodeGen::CodeGen() : stackOffset(0), labelCounter(0), lastExprWasFloat(false), 
                       debugGen(nullptr), currentSourceLine(0) {}
@@ -751,6 +753,19 @@ void CodeGen::visitVarDecl(VarDecl* node) {
         // Variable global
         // TODO: Implementar variables globales en .bss
     } else {
+        // DEAD CODE ELIMINATION: Si la variable fue optimizada y no necesita stack space, saltarla
+        if (optimizedVars.find(node->name) != optimizedVars.end()) {
+            // Variable optimizada, no necesita espacio en el stack
+            // Pero aún así registrarla en localVars (con offset 0) por si se necesita para debug
+            VarInfo varInfo;
+            varInfo.type = node->type;
+            varInfo.offset = 0;  // No tiene offset real porque no está en el stack
+            varInfo.isArray = node->isArray;
+            varInfo.dimensions = node->dimensions;
+            localVars[node->name] = varInfo;
+            return;  // No reservar espacio en el stack
+        }
+        
         // Variable local
         int size = 4; // Por defecto int, float
 
@@ -999,6 +1014,132 @@ void CodeGen::visitExprStmt(ExprStmt* node) {
     node->expression->accept(this);
 }
 
+// Helper para detectar variables optimizadas que no necesitan stack space
+void CodeGen::detectOptimizedVars(FunctionDecl* node) {
+    optimizedVars.clear();
+    
+    // Analizar el cuerpo para encontrar variables que fueron optimizadas
+    // Estrategia: Si un return statement es un literal (fue optimizado de variable a constante),
+    // entonces las variables que solo se usaban en ese return no necesitan stack
+    
+    set<string> declaredVars;  // Variables declaradas
+    set<string> usedVars;      // Variables realmente usadas (no optimizadas)
+    
+    function<void(Stmt*)> analyzeStmt = [&](Stmt* stmt) {
+        if (!stmt) return;
+        
+        // Si es una declaración de variable
+        if (VarDecl* varDecl = dynamic_cast<VarDecl*>(stmt)) {
+            declaredVars.insert(varDecl->name);
+        }
+        
+        // Si es un return
+        if (ReturnStmt* ret = dynamic_cast<ReturnStmt*>(stmt)) {
+            if (ret->value) {
+                // Si el return es un literal, significa que fue optimizado
+                // (originalmente era return var, ahora es return 6)
+                IntLiteral* lit = dynamic_cast<IntLiteral*>(ret->value.get());
+                if (lit) {
+                    // Return optimizado a constante - las variables que solo se usaban aquí
+                    // fueron optimizadas y no necesitan stack
+                    // (las detectaremos porque no aparecen en usedVars)
+                } else {
+                    // Return usa una variable - marcarla como usada
+                    Variable* var = dynamic_cast<Variable*>(ret->value.get());
+                    if (var) {
+                        usedVars.insert(var->name);
+                    }
+                }
+            }
+        }
+        
+        // Si es una asignación, la variable destino se usa
+        if (AssignStmt* assign = dynamic_cast<AssignStmt*>(stmt)) {
+            usedVars.insert(assign->varName);
+        }
+        
+        // Recursivamente analizar bloques
+        if (Block* block = dynamic_cast<Block*>(stmt)) {
+            for (auto& s : block->statements) {
+                analyzeStmt(s.get());
+            }
+        }
+        
+        // Analizar otros tipos de statements recursivamente
+        if (IfStmt* ifStmt = dynamic_cast<IfStmt*>(stmt)) {
+            analyzeStmt(ifStmt->thenBranch.get());
+            if (ifStmt->elseBranch) {
+                analyzeStmt(ifStmt->elseBranch.get());
+            }
+        }
+        if (WhileStmt* whileStmt = dynamic_cast<WhileStmt*>(stmt)) {
+            analyzeStmt(whileStmt->body.get());
+        }
+        if (ForStmt* forStmt = dynamic_cast<ForStmt*>(stmt)) {
+            if (forStmt->initializer) {
+                analyzeStmt(forStmt->initializer.get());
+            }
+            analyzeStmt(forStmt->body.get());
+        }
+    };
+    
+    analyzeStmt(node->body.get());
+    
+    // Variables declaradas pero no usadas = optimizadas/eliminadas
+    // Estas no necesitan espacio en el stack
+    for (const string& var : declaredVars) {
+        if (usedVars.find(var) == usedVars.end()) {
+            optimizedVars.insert(var);
+        }
+    }
+}
+
+// Helper para calcular el tamaño del stack sin generar código
+int CodeGen::calculateStackSize(FunctionDecl* node) {
+    int savedStackOffset = stackOffset;
+    map<string, VarInfo> savedLocalVars = localVars;
+    set<string> savedOptimizedVars = optimizedVars;
+    stringstream savedOutput;
+    savedOutput << output.str();
+    
+    // PRIMERO: Detectar variables optimizadas
+    detectOptimizedVars(node);
+    
+    // Resetear para cálculo
+    stackOffset = 0;
+    localVars.clear();
+    output.str("");  // Limpiar output temporalmente
+    
+    // Calcular espacio para parámetros
+    for (size_t i = 0; i < node->parameters.size() && i < 6; i++) {
+        auto& param = node->parameters[i];
+        int size = 4;
+        if (param.first == DataType::LONG) size = 8;
+        stackOffset += size;
+        
+        VarInfo varInfo;
+        varInfo.type = param.first;
+        varInfo.offset = stackOffset;
+        varInfo.isArray = false;
+        localVars[param.second] = varInfo;
+    }
+    
+    // Visitar el cuerpo para calcular variables locales
+    // visitVarDecl actualizará stackOffset sin generar código útil (solo en output temporal)
+    node->body->accept(this);
+    
+    int totalStackSize = stackOffset;
+    
+    // Restaurar estado
+    stackOffset = savedStackOffset;
+    localVars = savedLocalVars;
+    optimizedVars = savedOptimizedVars;
+    output.str("");
+    output << savedOutput.str();
+    
+    return totalStackSize;
+}
+
 void CodeGen::visitFunctionDecl(FunctionDecl* node) {
     // Usar la línea del nodo AST
     setSourceLine(node->line);
@@ -1015,14 +1156,45 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
     }
     functions[node->name] = funcInfo;
 
+    // PRIMERO: Calcular el tamaño real del stack necesario
+    int totalStackSize = calculateStackSize(node);
+    
+    // Calcular espacio solo para variables locales (sin parámetros)
+    int paramStackSize = 0;
+    for (size_t i = 0; i < node->parameters.size() && i < 6; i++) {
+        auto& param = node->parameters[i];
+        int size = 4;
+        if (param.first == DataType::LONG) size = 8;
+        paramStackSize += size;
+    }
+    
+    int localVarStackSize = totalStackSize - paramStackSize;
+    
+    // DEAD CODE ELIMINATION: Solo reservar stack si realmente hay variables locales
+    // Si localVarStackSize es 0 o negativo, no hay variables locales
+    if (localVarStackSize <= 0) {
+        localVarStackSize = 0;
+    } else {
+        // Alinear a 16 bytes solo si hay variables locales (requisito de ABI x86-64)
+        if (localVarStackSize % 16 != 0) {
+            localVarStackSize = ((localVarStackSize / 16) + 1) * 16;
+        }
+    }
+
     // Emitir label de función
     emitLabel(node->name);
 
-    // Prólogo (lo completaremos después de saber el tamaño del stack)
+    // Prólogo
     emit("push rbp");
     emit("mov rbp, rsp");
 
-    // Guardar parámetros en stack
+    // DEAD CODE ELIMINATION: Reservar espacio en el stack SOLO si hay variables locales
+    // Si no hay variables locales, no necesitamos reservar stack (los parámetros están en registros)
+    if (localVarStackSize > 0) {
+        emit("sub rsp, " + to_string(localVarStackSize));
+    }
+
+    // Guardar parámetros en stack y calcular stackOffset inicial
     vector<string> paramRegs = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     for (size_t i = 0; i < node->parameters.size() && i < 6; i++) {
         auto& param = node->parameters[i];
@@ -1044,13 +1216,13 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
             if (param.first == DataType::FLOAT) typeStr = "float";
             else if (param.first == DataType::LONG) typeStr = "long";
             
-            // Usar línea de la función para parámetros
             debugGen->logStackVariable(param.second, stackOffset, typeStr, 
                                       false, node->line);
         }
-
+        
+        // Guardar parámetro en stack
         if (param.first == DataType::LONG) {
-            emit("mov [rbp - " + to_string(stackOffset) + "], " + paramRegs[i]);
+            emit("mov [rbp - " + to_string(varInfo.offset) + "], " + paramRegs[i]);
         } else {
             // Para registros de 32 bits: rdi->edi, rsi->esi, etc.
             string reg32;
@@ -1061,41 +1233,12 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
             else if (paramRegs[i] == "r8") reg32 = "r8d";
             else if (paramRegs[i] == "r9") reg32 = "r9d";
 
-            emit("mov [rbp - " + to_string(stackOffset) + "], " + reg32);
+            emit("mov [rbp - " + to_string(varInfo.offset) + "], " + reg32);
         }
     }
 
-    // Cuerpo de la función
+    // Cuerpo de la función (DESPUÉS de reservar stack y guardar parámetros)
     node->body->accept(this);
-
-    // Ahora que sabemos el tamaño total del stack, reservar espacio
-    // CRÍTICO: Alinear a 16 bytes considerando que push rbp ya desalineó
-    int stackSize = stackOffset;
-
-    // Después de push rbp, rsp % 16 = 8
-    // Necesitamos que después de sub rsp, stackSize: rsp % 16 = 0
-    // Redondear stackSize al siguiente múltiplo de 16 si no es múltiplo
-    if (stackSize % 16 != 0) {
-        stackSize = ((stackSize / 16) + 1) * 16;
-    }
-
-    // Insertar reserva de stack después de mov rbp, rsp de esta función
-    string currentOutput = output.str();
-    string funcLabel = node->name + ":";
-    size_t funcLabelPos = currentOutput.rfind(funcLabel);
-    if (funcLabelPos != string::npos) {
-        size_t searchStart = funcLabelPos;
-        size_t markerPos = currentOutput.find("mov rbp, rsp", searchStart);
-        if (markerPos != string::npos) {
-            size_t insertPos = currentOutput.find("\n", markerPos) + 1;
-            if (stackSize > 0) {
-                string reserveCode = "    sub rsp, " + to_string(stackSize) + "\n";
-                currentOutput.insert(insertPos, reserveCode);
-                output.str("");
-                output << currentOutput;
-            }
-        }
-    }
 
     // Si no hubo return explícito
     if (node->returnType == DataType::VOID) {

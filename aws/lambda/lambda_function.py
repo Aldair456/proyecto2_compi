@@ -107,7 +107,7 @@ class X86Emulator:
         self.flags['SF'] = 1 if (result_masked >> sign_bit) & 1 else 0
     
     def parse_operand(self, op):
-        """Parsea un operando (registro, inmediato, memoria)"""
+        """Pa un operando (registro, inmediato, memoria)"""
         op = op.strip()
         
         # Registro

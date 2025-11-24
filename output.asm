@@ -1,6 +1,8 @@
 section .data
     fmt_int: db "%d", 10, 0
-    str_const_0: db "%d", 10, 0
+    str_const_5: db "%d", 10, 0
+    str_const_4: db "%d", 10, 0
+    str_const_3: db "%d", 10, 0
     fmt_float: db "%.2f", 10, 0
     fmt_long: db "%ld", 10, 0
 
@@ -13,11 +15,26 @@ section .text
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 16
-    lea rax, [str_const_0]
+    lea rax, [str_const_3]
     mov rdi, rax
     push rdi
-    mov eax, 6
+    mov eax, 15
+    mov rsi, rax
+    pop rdi
+    xor rax, rax
+    call printf
+    lea rax, [str_const_4]
+    mov rdi, rax
+    push rdi
+    mov eax, 5
+    mov rsi, rax
+    pop rdi
+    xor rax, rax
+    call printf
+    lea rax, [str_const_5]
+    mov rdi, rax
+    push rdi
+    mov eax, 50
     mov rsi, rax
     pop rdi
     xor rax, rax

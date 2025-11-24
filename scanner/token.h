@@ -13,6 +13,7 @@ enum class TokenType {
     PRINTF, INCLUDE,
     // Operadores aritméticos
     PLUS, MINUS, MULTIPLY, DIVIDE, MODULO,
+    INCREMENT, DECREMENT,  // ++ --
     
     // Operadores de asignación
     ASSIGN, PLUSEQ, MINUSEQ,

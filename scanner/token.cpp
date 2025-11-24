@@ -33,6 +33,8 @@ string Token::typeToString(TokenType type) {
         case TokenType::MULTIPLY: return "MULTIPLY";
         case TokenType::DIVIDE: return "DIVIDE";
         case TokenType::MODULO: return "MODULO";
+        case TokenType::INCREMENT: return "INCREMENT";
+        case TokenType::DECREMENT: return "DECREMENT";
         
         case TokenType::ASSIGN: return "ASSIGN";
         case TokenType::PLUSEQ: return "PLUSEQ";

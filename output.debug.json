@@ -1,20 +1,25 @@
 {
   "sourceLines": [
-    "// Optimización 5: Loop unrolling",
-    "// El compilador puede \"desenrollar\" loops pequeños",
+    "// Test 2: Operaciones aritméticas",
     "#include <stdio.h>",
     "",
     "int main() {",
+    "    int a;",
+    "    int b;",
     "    int sum;",
-    "    int i;",
+    "    int diff;",
+    "    int prod;",
     "    ",
-    "    sum = 0;",
+    "    a = 10;",
+    "    b = 5;",
     "    ",
-    "    for (i = 0; i < 4; i = i + 1) {",
-    "        sum = sum + i;",
-    "    }",
+    "    sum = a + b;",
+    "    diff = a - b;",
+    "    prod = a * b;",
     "    ",
     "    printf(\"%d\\n\", sum);",
+    "    printf(\"%d\\n\", diff);",
+    "    printf(\"%d\\n\", prod);",
     "    ",
     "    return 0;",
     "}",
@@ -25,87 +30,351 @@
   "instructions": [
     {
       "id": 0,
-      "assembly": "push rbp",
-      "sourceLine": 5,
-      "line": 5
+      "assembly": "lea rax, [str_const_0]",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 1,
-      "assembly": "mov rbp, rsp",
-      "sourceLine": 5,
-      "line": 5
+      "assembly": "mov rdi, rax",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 2,
-      "assembly": "lea rax, [str_const_0]",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "push rdi",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 3,
-      "assembly": "mov rdi, rax",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "mov eax, 15",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 4,
-      "assembly": "push rdi",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "mov rsi, rax",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 5,
-      "assembly": "mov eax, 6",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "pop rdi",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 6,
-      "assembly": "mov rsi, rax",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "xor rax, rax",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 7,
-      "assembly": "pop rdi",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "call printf",
+      "sourceLine": 18,
+      "line": 18
     },
     {
       "id": 8,
-      "assembly": "xor rax, rax",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "lea rax, [str_const_1]",
+      "sourceLine": 19,
+      "line": 19
     },
     {
       "id": 9,
-      "assembly": "call printf",
-      "sourceLine": 15,
-      "line": 15
+      "assembly": "mov rdi, rax",
+      "sourceLine": 19,
+      "line": 19
     },
     {
       "id": 10,
-      "assembly": "mov eax, 0",
-      "sourceLine": 17,
-      "line": 17
+      "assembly": "push rdi",
+      "sourceLine": 19,
+      "line": 19
     },
     {
       "id": 11,
-      "assembly": "mov rsp, rbp",
-      "sourceLine": 17,
-      "line": 17
+      "assembly": "mov eax, 5",
+      "sourceLine": 19,
+      "line": 19
     },
     {
       "id": 12,
-      "assembly": "pop rbp",
-      "sourceLine": 17,
-      "line": 17
+      "assembly": "mov rsi, rax",
+      "sourceLine": 19,
+      "line": 19
     },
     {
       "id": 13,
+      "assembly": "pop rdi",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 14,
+      "assembly": "xor rax, rax",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 15,
+      "assembly": "call printf",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 16,
+      "assembly": "lea rax, [str_const_2]",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 17,
+      "assembly": "mov rdi, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 18,
+      "assembly": "push rdi",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 19,
+      "assembly": "mov eax, 50",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 20,
+      "assembly": "mov rsi, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 21,
+      "assembly": "pop rdi",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 22,
+      "assembly": "xor rax, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 23,
+      "assembly": "call printf",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 24,
+      "assembly": "mov eax, 0",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 25,
+      "assembly": "mov rsp, rbp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 26,
+      "assembly": "pop rbp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 27,
       "assembly": "ret",
-      "sourceLine": 17,
-      "line": 17
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 28,
+      "assembly": "push rbp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 29,
+      "assembly": "mov rbp, rsp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 30,
+      "assembly": "lea rax, [str_const_3]",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 31,
+      "assembly": "mov rdi, rax",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 32,
+      "assembly": "push rdi",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 33,
+      "assembly": "mov eax, 15",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 34,
+      "assembly": "mov rsi, rax",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 35,
+      "assembly": "pop rdi",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 36,
+      "assembly": "xor rax, rax",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 37,
+      "assembly": "call printf",
+      "sourceLine": 18,
+      "line": 18
+    },
+    {
+      "id": 38,
+      "assembly": "lea rax, [str_const_4]",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 39,
+      "assembly": "mov rdi, rax",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 40,
+      "assembly": "push rdi",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 41,
+      "assembly": "mov eax, 5",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 42,
+      "assembly": "mov rsi, rax",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 43,
+      "assembly": "pop rdi",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 44,
+      "assembly": "xor rax, rax",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 45,
+      "assembly": "call printf",
+      "sourceLine": 19,
+      "line": 19
+    },
+    {
+      "id": 46,
+      "assembly": "lea rax, [str_const_5]",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 47,
+      "assembly": "mov rdi, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 48,
+      "assembly": "push rdi",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 49,
+      "assembly": "mov eax, 50",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 50,
+      "assembly": "mov rsi, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 51,
+      "assembly": "pop rdi",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 52,
+      "assembly": "xor rax, rax",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 53,
+      "assembly": "call printf",
+      "sourceLine": 20,
+      "line": 20
+    },
+    {
+      "id": 54,
+      "assembly": "mov eax, 0",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 55,
+      "assembly": "mov rsp, rbp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 56,
+      "assembly": "pop rbp",
+      "sourceLine": 22,
+      "line": 22
+    },
+    {
+      "id": 57,
+      "assembly": "ret",
+      "sourceLine": 22,
+      "line": 22
     }
   ]
 }

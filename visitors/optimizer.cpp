@@ -147,14 +147,19 @@ void Optimizer::optimizeBlock(Block* block) {
 
     // Recorrer cada statement del bloque
     for (auto& stmt : block->statements) {
-        // LOOP UNROLLING: Verificar si es un for-loop desenrollable
+        // LOOP CONSTANT EVALUATION: Verificar si es un loop constante evaluable
         if (ForStmt* forStmt = dynamic_cast<ForStmt*>(stmt.get())) {
-            // Intentar desenrollar el loop
+            // Intentar evaluar el loop en compile-time
+            if (tryEvaluateConstantLoop(forStmt, optimizedStmts)) {
+                // Loop fue evaluado exitosamente, ya se agregó a optimizedStmts
+                continue;
+            }
+            // Si no se pudo evaluar, intentar desenrollar
             if (tryUnrollLoop(forStmt, optimizedStmts)) {
                 // Loop fue desenrollado exitosamente, ya se agregó a optimizedStmts
                 continue;
             }
-            // Si no se pudo desenrollar, optimizar normalmente
+            // Si no se pudo optimizar, optimizar normalmente
         }
 
         // DEAD CODE ELIMINATION: Verificar si es un if con condición constante
@@ -662,6 +667,126 @@ bool Optimizer::tryUnrollLoop(ForStmt* forStmt, vector<unique_ptr<Stmt>>& output
     return true;
 }
 
+// ========== EVALUACIÓN DE LOOPS CONSTANTES ==========
+bool Optimizer::tryEvaluateConstantLoop(ForStmt* forStmt, vector<unique_ptr<Stmt>>& output) {
+    // Solo evaluar loops muy simples con constantes:
+    // - Inicializador: int i = 0 (o cualquier literal)
+    // - Condición: i < N (donde N es literal)
+    // - Incremento: i++ o i = i + 1
+    // - Cuerpo: solo acumula valores constantes (sum += i, etc.)
+
+    // 1. Verificar inicializador
+    if (!forStmt->initializer) return false;
+
+    VarDecl* initDecl = dynamic_cast<VarDecl*>(forStmt->initializer.get());
+    if (!initDecl || !initDecl->initializer) return false;
+
+    int startValue;
+    if (!isIntLiteral(initDecl->initializer.get(), startValue)) return false;
+    string loopVar = initDecl->name;
+
+    // 2. Verificar condición: i < N
+    if (!forStmt->condition) return false;
+
+    BinaryOp* condition = dynamic_cast<BinaryOp*>(forStmt->condition.get());
+    if (!condition || condition->op.type != TokenType::LT) return false;
+
+    Variable* condVar = dynamic_cast<Variable*>(condition->left.get());
+    if (!condVar || condVar->name != loopVar) return false;
+
+    int endValue;
+    if (!isIntLiteral(condition->right.get(), endValue)) return false;
+
+    // 3. Verificar incremento: i++ o i = i + 1
+    if (!forStmt->increment) return false;
+
+    int incValue = 1;
+    AssignExpr* incAssign = dynamic_cast<AssignExpr*>(forStmt->increment.get());
+    if (incAssign && incAssign->varName == loopVar) {
+        BinaryOp* incExpr = dynamic_cast<BinaryOp*>(incAssign->value.get());
+        if (incExpr && incExpr->op.type == TokenType::PLUS) {
+            Variable* incVar = dynamic_cast<Variable*>(incExpr->left.get());
+            if (incVar && incVar->name == loopVar) {
+                if (!isIntLiteral(incExpr->right.get(), incValue)) return false;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    // 4. Verificar que el cuerpo solo acumula valores constantes
+    // Buscar patrones como: sum += i, sum = sum + i, etc.
+    Block* bodyBlock = dynamic_cast<Block*>(forStmt->body.get());
+    if (!bodyBlock || bodyBlock->statements.size() != 1) return false;
+
+    Stmt* bodyStmt = bodyBlock->statements[0].get();
+    string accumVar;
+    bool isAccumulation = false;
+
+    // Verificar si es: sum += i
+    if (AssignStmt* assign = dynamic_cast<AssignStmt*>(bodyStmt)) {
+        if (assign->value) {
+            BinaryOp* binOp = dynamic_cast<BinaryOp*>(assign->value.get());
+            if (binOp && binOp->op.type == TokenType::PLUS) {
+                Variable* leftVar = dynamic_cast<Variable*>(binOp->left.get());
+                Variable* rightVar = dynamic_cast<Variable*>(binOp->right.get());
+                if (leftVar && leftVar->name == assign->varName) {
+                    if (rightVar && rightVar->name == loopVar) {
+                        accumVar = assign->varName;
+                        isAccumulation = true;
+                    }
+                } else if (rightVar && rightVar->name == assign->varName) {
+                    if (leftVar && leftVar->name == loopVar) {
+                        accumVar = assign->varName;
+                        isAccumulation = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!isAccumulation) return false;
+
+    // 5. Calcular el resultado en compile-time
+    int result = 0;
+    if (constantValues.find(accumVar) != constantValues.end()) {
+        result = constantValues[accumVar];
+    }
+
+    // Simular el loop: sum += i para cada i
+    for (int i = startValue; i < endValue; i += incValue) {
+        result += i;
+    }
+
+    // 6. Reemplazar el loop con una asignación directa
+    cout << "    Constant loop evaluation: loop replaced with constant " << result << endl;
+
+    // Agregar el inicializador del loop (si es necesario)
+    // NOTA: La variable del loop (i) será eliminada por dead code elimination si no se usa
+    if (initDecl) {
+        output.push_back(cloneStmt(initDecl));
+    }
+
+    // Crear asignación: accumVar = result
+    // NOTA: Esta asignación será eliminada por dead code elimination si accumVar solo se usa en return
+    // y el return se optimiza a return result (constant propagation)
+    auto resultExpr = make_unique<IntLiteral>(result);
+    resultExpr->line = forStmt->line;
+    auto assignStmt = make_unique<AssignStmt>(accumVar, move(resultExpr));
+    assignStmt->line = forStmt->line;
+    output.push_back(move(assignStmt));
+
+    // Actualizar constantValues para que constant propagation pueda reemplazar usos de accumVar
+    // Esto hará que "return sum" se convierta en "return 6"
+    constantValues[accumVar] = result;
+
+    return true;
+}
+
 // ========== CLONACIÓN DE NODOS ==========
 unique_ptr<Stmt> Optimizer::cloneStmt(Stmt* stmt) {
     if (!stmt) return nullptr;
@@ -813,14 +938,15 @@ void Optimizer::eliminateDeadStores(Block* block) {
         
         // Si es un VarDecl con inicializador
         else if (VarDecl* varDecl = dynamic_cast<VarDecl*>(stmt)) {
-            if (varDecl->initializer) {
-                // Si la variable NO se lee después, la inicialización es muerta
-                if (liveVars.find(varDecl->name) == liveVars.end()) {
-                    // No podemos eliminar la declaración, pero sí el inicializador
-                    cout << "    Dead initialization: " << varDecl->name << endl;
-                    varDecl->initializer = nullptr;
-                } else {
-                    liveVars.erase(varDecl->name);
+            // Si la variable NO se lee después, la declaración completa es muerta
+            if (liveVars.find(varDecl->name) == liveVars.end()) {
+                // DEAD CODE ELIMINATION: Eliminar la declaración completa si no se usa
+                isDead[i] = true;
+                cout << "    Dead variable declaration eliminated: " << varDecl->name << endl;
+            } else {
+                // Se lee después, es necesaria
+                liveVars.erase(varDecl->name);
+                if (varDecl->initializer) {
                     getReadVariables(varDecl->initializer.get(), liveVars);
                 }
             }

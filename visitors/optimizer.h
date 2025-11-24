@@ -36,6 +36,11 @@ private:
     // Intenta desenrollar un for-loop si cumple ciertas condiciones
     // Retorna true si fue desenrollado, y agrega los statements a output
     bool tryUnrollLoop(ForStmt* forStmt, vector<unique_ptr<Stmt>>& output);
+    
+    // Intenta evaluar un loop constante en compile-time
+    // Si el loop solo acumula valores constantes, calcula el resultado y reemplaza el loop
+    // Retorna true si fue evaluado, y agrega el statement optimizado a output
+    bool tryEvaluateConstantLoop(ForStmt* forStmt, vector<unique_ptr<Stmt>>& output);
     // Intenta optimizar una expresión binaria (2 + 3, x * 4, etc.)
     // Devuelve un nuevo nodo optimizado (o el mismo si no se puede optimizar)
     unique_ptr<Expr> optimizeBinaryOp(BinaryOp* node);

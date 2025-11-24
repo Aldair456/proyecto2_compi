@@ -557,7 +557,33 @@ unique_ptr<Expr> Parser::postfix() {
             
             unique_ptr<ArrayAccess> arrAccess = make_unique<ArrayAccess>(arrayName, move(indices));
             arrAccess->line = bracketToken.line;  // Línea del primer '['
-            return arrAccess;
+            expr = move(arrAccess);
+        }
+    }
+    
+    // Postfix increment/decrement: i++, i--
+    while (match({TokenType::INCREMENT, TokenType::DECREMENT})) {
+        Token op = previous();
+        // i++ se convierte en: i = i + 1
+        // i-- se convierte en: i = i - 1
+        if (Variable* var = dynamic_cast<Variable*>(expr.get())) {
+            TokenType binOp = (op.type == TokenType::INCREMENT) ? TokenType::PLUS : TokenType::MINUS;
+            unique_ptr<Expr> one = make_unique<IntLiteral>(1);
+            one->line = op.line;
+            unique_ptr<BinaryOp> addExpr = make_unique<BinaryOp>(
+                make_unique<Variable>(var->name),
+                Token(binOp, op.type == TokenType::INCREMENT ? "+" : "-", op.line, op.column),
+                move(one)
+            );
+            addExpr->line = op.line;
+            
+            // Crear asignación: i = i + 1
+            unique_ptr<AssignExpr> assignExpr = make_unique<AssignExpr>(var->name, move(addExpr));
+            assignExpr->line = op.line;
+            expr = move(assignExpr);
+        } else {
+            // Si no es una variable, crear UnaryOp (aunque esto no es común en C)
+            expr = make_unique<UnaryOp>(op, move(expr));
         }
     }
     

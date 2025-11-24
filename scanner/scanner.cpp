@@ -94,11 +94,23 @@ void Scanner::scanToken() {
         
         // Operadores (simples y compuestos)
         case '+':
-            addToken(match('=') ? TokenType::PLUSEQ : TokenType::PLUS);
+            if (match('+')) {
+                addToken(TokenType::INCREMENT);  // ++
+            } else if (match('=')) {
+                addToken(TokenType::PLUSEQ);     // +=
+            } else {
+                addToken(TokenType::PLUS);       // +
+            }
             break;
             
         case '-':
-            addToken(match('=') ? TokenType::MINUSEQ : TokenType::MINUS);
+            if (match('-')) {
+                addToken(TokenType::DECREMENT);  // --
+            } else if (match('=')) {
+                addToken(TokenType::MINUSEQ);     // -=
+            } else {
+                addToken(TokenType::MINUS);       // -
+            }
             break;
             
         case '*':
