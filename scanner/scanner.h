@@ -10,17 +10,15 @@ using namespace std;
 
 class Scanner {
 private:
-    string source;           // Código fuente completo
-    vector<Token> tokens;    // Lista de tokens generados
-    int start;               // Inicio del lexema actual
-    int current;             // Posición actual en el source
-    int line;                // Línea actual
-    int column;              // Columna actual
+    string source;
+    vector<Token> tokens;
+    int start;
+    int current;
+    int line;
+    int column;
     
-    // Mapa de palabras reservadas
     map<string, TokenType> keywords;
     
-    // Métodos auxiliares
     bool isAtEnd();
     char advance();
     char peek();

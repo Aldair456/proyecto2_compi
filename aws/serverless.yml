@@ -19,7 +19,7 @@ provider:
 
 functions:
   compile:
-    handler: lambda/lambda_function.lambda_handler
+    handler: lambda.handlers.lambda_function.lambda_handler
     description: Compila código C y genera assembly + debug.json + emulación x86-64
     memorySize: 1536
     timeout: 180

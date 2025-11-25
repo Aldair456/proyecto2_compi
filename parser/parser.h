@@ -15,7 +15,6 @@ private:
     vector<Token> tokens;
     int current;
     
-    // Helpers para navegar tokens
     Token peek();
     Token previous();
     Token advance();
@@ -24,10 +23,8 @@ private:
     bool match(vector<TokenType> types);
     Token consume(TokenType type, string message);
     
-    // Convertir TokenType a DataType
     DataType tokenToDataType(Token token);
     
-    // Parsing de declaraciones y statements
     unique_ptr<Stmt> declaration();
     unique_ptr<Stmt> varDeclaration();
     unique_ptr<Stmt> functionDeclaration();
@@ -39,7 +36,6 @@ private:
     unique_ptr<Stmt> returnStatement();
     unique_ptr<Block> block();
     
-    // Parsing de expresiones (por precedencia)
     unique_ptr<Expr> expression();
     unique_ptr<Expr> assignment();
     unique_ptr<Expr> ternary();
@@ -54,7 +50,6 @@ private:
     unique_ptr<Expr> postfix();
     unique_ptr<Expr> primary();
     
-    // Error handling
     void error(string message);
     void synchronize();
 

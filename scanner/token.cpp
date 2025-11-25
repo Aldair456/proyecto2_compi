@@ -1,19 +1,15 @@
 #include "token.h"
 
-// Constructor
 Token::Token(TokenType type, string lexeme, int line, int column) 
     : type(type), lexeme(lexeme), line(line), column(column) {}
 
-// Constructor por defecto
 Token::Token() : type(TokenType::UNKNOWN), lexeme(""), line(0), column(0) {}
 
-// Convierte el token a string para debugging
 string Token::toString() const {
     return "Token(" + typeToString(type) + ", \"" + lexeme + "\", " + 
            to_string(line) + ":" + to_string(column) + ")";
 }
 
-// Helper para convertir TokenType a string
 string Token::typeToString(TokenType type) {
     switch(type) {
         case TokenType::INT: return "INT";

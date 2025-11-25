@@ -2,7 +2,6 @@
 #include <iostream>
 #include <sstream>
 
-// Helper para escapar JSON
 static string escapeJSON(const string& str) {
     stringstream escaped;
     for (char c : str) {
@@ -21,12 +20,10 @@ DebugGen::DebugGen() : instructionCounter(0) {}
 void DebugGen::setSourceCode(const string& source) {
     sourceCode = source;
     
-    // Dividir en líneas y limpiar \r (Windows line endings)
     sourceLines.clear();
     stringstream ss(source);
     string line;
     while (getline(ss, line)) {
-        // Eliminar \r al final (Windows CRLF)
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
@@ -73,7 +70,6 @@ string DebugGen::getJSON() {
     }
     json << "  ],\n";
     
-    // Agregar información del stack frame
     json << "  \"stackFrame\": [\n";
     for (size_t i = 0; i < stackFrames.size(); i++) {
         const auto& frame = stackFrames[i];

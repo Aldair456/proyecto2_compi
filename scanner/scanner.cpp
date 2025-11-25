@@ -70,7 +70,6 @@ void Scanner::scanToken() {
     char c = advance();
     
     switch (c) {
-        // Espacios en blanco
         case ' ':
         case '\r':
         case '\t':
@@ -81,7 +80,6 @@ void Scanner::scanToken() {
             column = 1;
             break;
             
-        // Delimitadores simples
         case '(': addToken(TokenType::LPAREN); break;
         case ')': addToken(TokenType::RPAREN); break;
         case '{': addToken(TokenType::LBRACE); break;
@@ -92,24 +90,23 @@ void Scanner::scanToken() {
         case ',': addToken(TokenType::COMMA); break;
         case '%': addToken(TokenType::MODULO); break;
         
-        // Operadores (simples y compuestos)
         case '+':
             if (match('+')) {
-                addToken(TokenType::INCREMENT);  // ++
+                addToken(TokenType::INCREMENT);
             } else if (match('=')) {
-                addToken(TokenType::PLUSEQ);     // +=
+                addToken(TokenType::PLUSEQ);
             } else {
-                addToken(TokenType::PLUS);       // +
+                addToken(TokenType::PLUS);
             }
             break;
             
         case '-':
             if (match('-')) {
-                addToken(TokenType::DECREMENT);  // --
+                addToken(TokenType::DECREMENT);
             } else if (match('=')) {
-                addToken(TokenType::MINUSEQ);     // -=
+                addToken(TokenType::MINUSEQ);
             } else {
-                addToken(TokenType::MINUS);       // -
+                addToken(TokenType::MINUS);
             }
             break;
             
@@ -119,14 +116,12 @@ void Scanner::scanToken() {
             
         case '/':
             if (match('/')) {
-                // Comentario de línea
                 while (peek() != '\n' && !isAtEnd()) advance();
             } else if (match('*')) {
-                // Comentario de bloque
                 while (!isAtEnd()) {
                     if (peek() == '*' && peekNext() == '/') {
-                        advance(); // consume '*'
-                        advance(); // consume '/'
+                        advance();
+                        advance();
                         break;
                     }
                     if (peek() == '\n') {
@@ -177,7 +172,6 @@ void Scanner::scanToken() {
             break;
             
         case '#':
-            // Procesar directivas de preprocesador (#include)
             while (peek() != '\n' && !isAtEnd()) advance();
             break;
             
@@ -187,7 +181,6 @@ void Scanner::scanToken() {
             } else if (isAlpha(c)) {
                 identifier();
             } else {
-                // Error: carácter desconocido
                 addToken(TokenType::UNKNOWN);
             }
             break;
@@ -199,7 +192,6 @@ void Scanner::identifier() {
     
     string text = source.substr(start, current - start);
     
-    // Verificar si es palabra reservada
     TokenType type = TokenType::IDENTIFIER;
     if (keywords.find(text) != keywords.end()) {
         type = keywords[text];
@@ -212,17 +204,14 @@ void Scanner::number() {
     bool isFloat = false;
     bool isLong = false;
     
-    // Parte entera
     while (isDigit(peek())) advance();
     
-    // Parte decimal
     if (peek() == '.' && isDigit(peekNext())) {
         isFloat = true;
-        advance(); // consume '.'
+        advance();
         while (isDigit(peek())) advance();
     }
     
-    // Sufijo L para long
     if (peek() == 'L' || peek() == 'l') {
         isLong = true;
         advance();
@@ -249,14 +238,11 @@ void Scanner::scanString() {
     }
     
     if (isAtEnd()) {
-        // Error: string sin cerrar
         return;
     }
     
-    // Consume el " de cierre
     advance();
     
-    // Extraer el valor sin las comillas
     string value = source.substr(start + 1, current - start - 2);
     addToken(TokenType::STRING_LITERAL, value);
 }

@@ -3,8 +3,6 @@
 
 Parser::Parser(vector<Token> tokens) : tokens(tokens), current(0) {}
 
-// ========== HELPERS ==========
-
 Token Parser::peek() {
     return tokens[current];
 }
@@ -78,7 +76,6 @@ DataType Parser::tokenToDataType(Token token) {
         case TokenType::FLOAT: return DataType::FLOAT;
         case TokenType::LONG: return DataType::LONG;
         case TokenType::UNSIGNED:
-            // Verifica si es "unsigned int"
             if (check(TokenType::INT)) {
                 advance();
                 return DataType::UNSIGNED_INT;
@@ -87,8 +84,6 @@ DataType Parser::tokenToDataType(Token token) {
         default: return DataType::UNKNOWN;
     }
 }
-
-// ========== MAIN PARSE ==========
 
 unique_ptr<Program> Parser::parse() {
     vector<unique_ptr<Stmt>> statements;
@@ -104,23 +99,18 @@ unique_ptr<Program> Parser::parse() {
     return make_unique<Program>(move(statements));
 }
 
-// ========== DECLARATIONS ==========
-
 unique_ptr<Stmt> Parser::declaration() {
-    // Verificar si es declaración de tipo
     if (match({TokenType::INT, TokenType::FLOAT, TokenType::LONG, TokenType::UNSIGNED})) {
         Token typeToken = previous();
         DataType type = tokenToDataType(typeToken);
         
         Token name = consume(TokenType::IDENTIFIER, "Expected variable or function name.");
         
-        // Es una función?
         if (check(TokenType::LPAREN)) {
-            advance(); // consume '('
+            advance();
             
             vector<pair<DataType, string>> parameters;
             
-            // Parsear parámetros
             if (!check(TokenType::RPAREN)) {
                 do {
                     Token paramTypeToken = advance();
@@ -132,21 +122,17 @@ unique_ptr<Stmt> Parser::declaration() {
             
             consume(TokenType::RPAREN, "Expected ')' after parameters.");
             
-            // Cuerpo de la función
             consume(TokenType::LBRACE, "Expected '{' before function body.");
             unique_ptr<Block> body = block();
             
             unique_ptr<FunctionDecl> func = make_unique<FunctionDecl>(type, name.lexeme, parameters, move(body));
-            func->line = name.line;  // Establecer línea del token
+            func->line = name.line;
             return func;
         }
         
-        // Es una variable o array
-        // Es un array?
         if (match({TokenType::LBRACKET})) {
             vector<int> dimensions;
             
-            // Parsear dimensiones: [3][4]
             do {
                 Token sizeToken = consume(TokenType::INT_LITERAL, "Expected array size.");
                 dimensions.push_back(stoi(sizeToken.lexeme));
@@ -154,13 +140,11 @@ unique_ptr<Stmt> Parser::declaration() {
             } while (match({TokenType::LBRACKET}));
             
             unique_ptr<VarDecl> varDecl = make_unique<VarDecl>(type, name.lexeme, dimensions);
-            varDecl->line = name.line;  // Establecer línea del token
+            varDecl->line = name.line;
             
-            // Inicializador de array? = {1, 2, 3}
             if (match({TokenType::ASSIGN})) {
                 consume(TokenType::LBRACE, "Expected '{' for array initializer.");
                 
-                // Por ahora simplemente saltamos hasta }
                 int braceCount = 1;
                 while (braceCount > 0 && !isAtEnd()) {
                     if (check(TokenType::LBRACE)) braceCount++;
@@ -173,7 +157,6 @@ unique_ptr<Stmt> Parser::declaration() {
             return varDecl;
         }
         
-        // Variable simple con inicializador opcional
         unique_ptr<Expr> initializer = nullptr;
         if (match({TokenType::ASSIGN})) {
             initializer = expression();
@@ -181,15 +164,12 @@ unique_ptr<Stmt> Parser::declaration() {
         
         consume(TokenType::SEMICOLON, "Expected ';' after variable declaration.");
         unique_ptr<VarDecl> varDecl = make_unique<VarDecl>(type, name.lexeme, move(initializer));
-        varDecl->line = name.line;  // Establecer línea del token
+        varDecl->line = name.line;
         return varDecl;
     }
     
-    // Si no es declaración, es un statement
     return statement();
 }
-
-// ========== STATEMENTS ==========
 
 unique_ptr<Stmt> Parser::statement() {
     if (match({TokenType::IF})) return ifStatement();
@@ -202,18 +182,15 @@ unique_ptr<Stmt> Parser::statement() {
 }
 
 unique_ptr<Stmt> Parser::exprStatement() {
-    // Manejo especial para asignaciones
     if (check(TokenType::IDENTIFIER)) {
         Token name = peek();
         int savedPos = current;
         advance();
         
-        // Asignación a variable: x = expr;
         if (match({TokenType::ASSIGN, TokenType::PLUSEQ, TokenType::MINUSEQ})) {
             Token op = previous();
             unique_ptr<Expr> value = expression();
             
-            // Manejar += y -=
             if (op.type == TokenType::PLUSEQ) {
                 value = make_unique<BinaryOp>(
                     make_unique<Variable>(name.lexeme),
@@ -230,11 +207,10 @@ unique_ptr<Stmt> Parser::exprStatement() {
             
             consume(TokenType::SEMICOLON, "Expected ';' after assignment.");
             unique_ptr<AssignStmt> assign = make_unique<AssignStmt>(name.lexeme, move(value));
-            assign->line = name.line;  // Establecer línea del token
+            assign->line = name.line;
             return assign;
         }
         
-        // Asignación a array: arr[i] = expr;
         if (check(TokenType::LBRACKET)) {
             vector<unique_ptr<Expr>> indices;
             
@@ -247,25 +223,24 @@ unique_ptr<Stmt> Parser::exprStatement() {
                 unique_ptr<Expr> value = expression();
                 consume(TokenType::SEMICOLON, "Expected ';' after assignment.");
                 unique_ptr<AssignStmt> assign = make_unique<AssignStmt>(name.lexeme, move(indices), move(value));
-                assign->line = name.line;  // Establecer línea del token
+                assign->line = name.line;
                 return assign;
             }
         }
         
-        // No es asignación, retroceder
         current = savedPos;
     }
     
-    Token startToken = peek();  // Token al inicio de la expresión
+    Token startToken = peek();
     unique_ptr<Expr> expr = expression();
     consume(TokenType::SEMICOLON, "Expected ';' after expression.");
     unique_ptr<ExprStmt> exprStmt = make_unique<ExprStmt>(move(expr));
-    exprStmt->line = startToken.line;  // Línea del inicio de la expresión
+    exprStmt->line = startToken.line;
     return exprStmt;
 }
 
 unique_ptr<Stmt> Parser::ifStatement() {
-    Token ifToken = previous();  // El token 'if' que ya se consumió en statement()
+    Token ifToken = previous();
     consume(TokenType::LPAREN, "Expected '(' after 'if'.");
     unique_ptr<Expr> condition = expression();
     consume(TokenType::RPAREN, "Expected ')' after if condition.");
@@ -283,7 +258,7 @@ unique_ptr<Stmt> Parser::ifStatement() {
 }
 
 unique_ptr<Stmt> Parser::whileStatement() {
-    Token whileToken = previous();  // El token 'while' que ya se consumió
+    Token whileToken = previous();
     consume(TokenType::LPAREN, "Expected '(' after 'while'.");
     unique_ptr<Expr> condition = expression();
     consume(TokenType::RPAREN, "Expected ')' after while condition.");
@@ -294,11 +269,11 @@ unique_ptr<Stmt> Parser::whileStatement() {
     whileStmt->line = whileToken.line;
     return whileStmt;
 }
+
 unique_ptr<Stmt> Parser::forStatement() {
-    Token forToken = previous();  // El token 'for' que ya se consumió
+    Token forToken = previous();
     consume(TokenType::LPAREN, "Expected '(' after 'for'.");
 
-    // Initializer: int i = 0 o i = 0
     unique_ptr<Stmt> initializer = nullptr;
     if (match({TokenType::INT, TokenType::FLOAT, TokenType::LONG, TokenType::UNSIGNED})) {
         Token typeToken = previous();
@@ -311,21 +286,19 @@ unique_ptr<Stmt> Parser::forStatement() {
         }
         consume(TokenType::SEMICOLON, "Expected ';' after for initializer.");
         initializer = make_unique<VarDecl>(type, name.lexeme, move(init));
-        initializer->line = name.line;  // Establecer línea
+        initializer->line = name.line;
     } else if (!check(TokenType::SEMICOLON)) {
         initializer = exprStatement();
     } else {
-        advance(); // Consume ';'
+        advance();
     }
 
-    // Condition: i < 10
     unique_ptr<Expr> condition = nullptr;
     if (!check(TokenType::SEMICOLON)) {
         condition = expression();
     }
     consume(TokenType::SEMICOLON, "Expected ';' after for condition.");
 
-    // Increment: i++ (expresión normal)
     unique_ptr<Expr> increment = nullptr;
     if (!check(TokenType::RPAREN)) {
         increment = expression();
@@ -340,7 +313,7 @@ unique_ptr<Stmt> Parser::forStatement() {
 }
 
 unique_ptr<Stmt> Parser::returnStatement() {
-    Token returnToken = previous();  // El token 'return' que ya se consumió
+    Token returnToken = previous();
     unique_ptr<Expr> value = nullptr;
     
     if (!check(TokenType::SEMICOLON)) {
@@ -364,30 +337,23 @@ unique_ptr<Block> Parser::block() {
     return make_unique<Block>(move(statements));
 }
 
-// ========== EXPRESSIONS (Precedencia descendente) ==========
-
 unique_ptr<Expr> Parser::expression() {
     return assignment();
 }
 
 unique_ptr<Expr> Parser::assignment() {
-    // Primero intentar parsear una expresión de menor precedencia
     unique_ptr<Expr> expr = ternary();
     
-    // Si encontramos un ASSIGN, entonces es una asignación
-    // En C, las asignaciones son expresiones que retornan el valor asignado
     if (match({TokenType::ASSIGN, TokenType::PLUSEQ, TokenType::MINUSEQ})) {
         Token op = previous();
-        unique_ptr<Expr> value = assignment(); // Asociatividad a la derecha
+        unique_ptr<Expr> value = assignment();
         
-        // Verificar que el lado izquierdo es una variable
         Variable* var = dynamic_cast<Variable*>(expr.get());
         if (!var) {
             error("Left side of assignment must be a variable.");
             throw runtime_error("Left side of assignment must be a variable.");
         }
         
-        // Manejar += y -=
         if (op.type == TokenType::PLUSEQ) {
             value = make_unique<BinaryOp>(
                 make_unique<Variable>(var->name),
@@ -402,13 +368,11 @@ unique_ptr<Expr> Parser::assignment() {
             );
         }
         
-        // Crear una expresión de asignación que retorna el valor asignado
         unique_ptr<AssignExpr> assignExpr = make_unique<AssignExpr>(var->name, move(value));
-        assignExpr->line = op.line;  // Línea del operador de asignación
+        assignExpr->line = op.line;
         return assignExpr;
     }
     
-    // Verificar si es asignación a array: arr[i] = expr
     if (ArrayAccess* arrAccess = dynamic_cast<ArrayAccess*>(expr.get())) {
         if (match({TokenType::ASSIGN})) {
             Token assignToken = previous();
@@ -424,10 +388,6 @@ unique_ptr<Expr> Parser::assignment() {
 
 unique_ptr<Expr> Parser::ternary() {
     unique_ptr<Expr> expr = logicalOr();
-    
-    // Operador ternario: condition ? exprTrue : exprFalse
-    // Por ahora lo omitimos hasta tener el token '?'
-    // TODO: Implementar cuando agreguemos QUESTION y COLON tokens
     
     return expr;
 }
@@ -515,12 +475,10 @@ unique_ptr<Expr> Parser::unary() {
 }
 
 unique_ptr<Expr> Parser::cast() {
-    // Casting: (float)x, (int)y
     if (check(TokenType::LPAREN)) {
         int savedPos = current;
-        advance(); // consume '('
+        advance();
         
-        // Verificar si es un tipo
         if (match({TokenType::INT, TokenType::FLOAT, TokenType::LONG, TokenType::UNSIGNED})) {
             Token typeToken = previous();
             DataType targetType = tokenToDataType(typeToken);
@@ -528,12 +486,11 @@ unique_ptr<Expr> Parser::cast() {
             if (match({TokenType::RPAREN})) {
                 unique_ptr<Expr> expr = cast();
                 unique_ptr<CastExpr> castExpr = make_unique<CastExpr>(targetType, move(expr));
-                castExpr->line = typeToken.line;  // Línea del token de tipo
+                castExpr->line = typeToken.line;
                 return castExpr;
             }
         }
         
-        // No es un cast, retroceder
         current = savedPos;
     }
     
@@ -543,29 +500,25 @@ unique_ptr<Expr> Parser::cast() {
 unique_ptr<Expr> Parser::postfix() {
     unique_ptr<Expr> expr = primary();
     
-    // Array access: arr[i][j]
     if (Variable* var = dynamic_cast<Variable*>(expr.get())) {
         if (check(TokenType::LBRACKET)) {
             string arrayName = var->name;
             vector<unique_ptr<Expr>> indices;
             
-            Token bracketToken = peek();  // Token del primer '['
+            Token bracketToken = peek();
             while (match({TokenType::LBRACKET})) {
                 indices.push_back(expression());
                 consume(TokenType::RBRACKET, "Expected ']'.");
             }
             
             unique_ptr<ArrayAccess> arrAccess = make_unique<ArrayAccess>(arrayName, move(indices));
-            arrAccess->line = bracketToken.line;  // Línea del primer '['
+            arrAccess->line = bracketToken.line;
             expr = move(arrAccess);
         }
     }
     
-    // Postfix increment/decrement: i++, i--
     while (match({TokenType::INCREMENT, TokenType::DECREMENT})) {
         Token op = previous();
-        // i++ se convierte en: i = i + 1
-        // i-- se convierte en: i = i - 1
         if (Variable* var = dynamic_cast<Variable*>(expr.get())) {
             TokenType binOp = (op.type == TokenType::INCREMENT) ? TokenType::PLUS : TokenType::MINUS;
             unique_ptr<Expr> one = make_unique<IntLiteral>(1);
@@ -577,12 +530,10 @@ unique_ptr<Expr> Parser::postfix() {
             );
             addExpr->line = op.line;
             
-            // Crear asignación: i = i + 1
             unique_ptr<AssignExpr> assignExpr = make_unique<AssignExpr>(var->name, move(addExpr));
             assignExpr->line = op.line;
             expr = move(assignExpr);
         } else {
-            // Si no es una variable, crear UnaryOp (aunque esto no es común en C)
             expr = make_unique<UnaryOp>(op, move(expr));
         }
     }
@@ -591,7 +542,6 @@ unique_ptr<Expr> Parser::postfix() {
 }
 
 unique_ptr<Expr> Parser::primary() {
-    // Literales numéricos
     if (match({TokenType::INT_LITERAL})) {
         Token token = previous();
         unique_ptr<IntLiteral> lit = make_unique<IntLiteral>(stoi(token.lexeme));
@@ -609,7 +559,6 @@ unique_ptr<Expr> Parser::primary() {
     if (match({TokenType::LONG_LITERAL})) {
         Token token = previous();
         string lexeme = token.lexeme;
-        // Remover el sufijo 'L'
         if (lexeme.back() == 'L' || lexeme.back() == 'l') {
             lexeme.pop_back();
         }
@@ -618,7 +567,6 @@ unique_ptr<Expr> Parser::primary() {
         return lit;
     }
     
-    // String literal
     if (match({TokenType::STRING_LITERAL})) {
         Token token = previous();
         unique_ptr<StringLiteral> lit = make_unique<StringLiteral>(token.lexeme);
@@ -626,17 +574,13 @@ unique_ptr<Expr> Parser::primary() {
         return lit;
     }
     
-    // Identificadores (variables o llamadas a función)
-    // También reconocer PRINTF como identificador para llamadas a función
     if (match({TokenType::IDENTIFIER, TokenType::PRINTF})) {
         Token name = previous();
         
-        // Si es PRINTF, cambiar el lexeme a "printf"
         if (name.type == TokenType::PRINTF) {
             name.lexeme = "printf";
         }
         
-        // Llamada a función
         if (match({TokenType::LPAREN})) {
             vector<unique_ptr<Expr>> arguments;
             
@@ -652,13 +596,11 @@ unique_ptr<Expr> Parser::primary() {
             return call;
         }
         
-        // Variable simple
         unique_ptr<Variable> var = make_unique<Variable>(name.lexeme);
         var->line = name.line;
         return var;
     }
     
-    // Expresiones entre paréntesis
     if (match({TokenType::LPAREN})) {
         unique_ptr<Expr> expr = expression();
         consume(TokenType::RPAREN, "Expected ')' after expression.");
@@ -668,4 +610,3 @@ unique_ptr<Expr> Parser::primary() {
     error("Expected expression.");
     throw runtime_error("Expected expression.");
 }
-

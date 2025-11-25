@@ -8,10 +8,8 @@
 
 using namespace std;
 
-// Forward declarations
 class Visitor;
 
-// ========== TIPOS DE DATOS ==========
 enum class DataType {
     INT,
     FLOAT,
@@ -23,26 +21,21 @@ enum class DataType {
 
 string dataTypeToString(DataType type);
 
-// ========== CLASE BASE PARA EXPRESIONES ==========
 class Expr {
 public:
     virtual ~Expr() = default;
     virtual void accept(Visitor* visitor) = 0;
     DataType inferredType = DataType::UNKNOWN;
-    int line = 1;  // Línea de código fuente donde aparece
+    int line = 1;
 };
 
-// ========== CLASE BASE PARA STATEMENTS ==========
 class Stmt {
 public:
     virtual ~Stmt() = default;
     virtual void accept(Visitor* visitor) = 0;
-    int line = 1;  // Línea de código fuente donde aparece
+    int line = 1;
 };
 
-// ========== EXPRESIONES ==========
-
-// Literales numéricos
 class IntLiteral : public Expr {
 public:
     int value;
@@ -64,7 +57,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// String literal
 class StringLiteral : public Expr {
 public:
     string value;
@@ -72,7 +64,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Variable (identificador)
 class Variable : public Expr {
 public:
     string name;
@@ -80,7 +71,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Operación binaria: +, -, *, /, ==, <, >, etc.
 class BinaryOp : public Expr {
 public:
     unique_ptr<Expr> left;
@@ -91,7 +81,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Operación unaria: -, !
 class UnaryOp : public Expr {
 public:
     Token op;
@@ -101,7 +90,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Casting explícito: (float)x, (int)y
 class CastExpr : public Expr {
 public:
     DataType targetType;
@@ -111,7 +99,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Operador ternario: condition ? exprTrue : exprFalse
 class TernaryExpr : public Expr {
 public:
     unique_ptr<Expr> condition;
@@ -122,7 +109,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Llamada a función: suma(a, b)
 class CallExpr : public Expr {
 public:
     string functionName;
@@ -132,17 +118,15 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Acceso a array: arr[i] o matriz[i][j]
 class ArrayAccess : public Expr {
 public:
     string arrayName;
-    vector<unique_ptr<Expr>> indices; // Para multidimensional
+    vector<unique_ptr<Expr>> indices;
     
     ArrayAccess(string arrayName, vector<unique_ptr<Expr>> indices);
     void accept(Visitor* visitor) override;
 };
 
-// Asignación como expresión: i = i + 1 (retorna el valor asignado)
 class AssignExpr : public Expr {
 public:
     string varName;
@@ -155,32 +139,26 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// ========== STATEMENTS ==========
-
-// Declaración de variable: int x; float y = 3.14;
 class VarDecl : public Stmt {
 public:
     DataType type;
     string name;
-    unique_ptr<Expr> initializer; // Puede ser nullptr
+    unique_ptr<Expr> initializer;
     
-    // Para arrays
     bool isArray;
-    vector<int> dimensions; // [3][4] -> {3, 4}
-    vector<unique_ptr<Expr>> arrayInitializer; // {1, 2, 3}
+    vector<int> dimensions;
+    vector<unique_ptr<Expr>> arrayInitializer;
     
     VarDecl(DataType type, string name, unique_ptr<Expr> initializer = nullptr);
-    VarDecl(DataType type, string name, vector<int> dimensions); // Array
+    VarDecl(DataType type, string name, vector<int> dimensions);
     void accept(Visitor* visitor) override;
 };
 
-// Asignación: x = 10; arr[i] = 5;
 class AssignStmt : public Stmt {
 public:
     string varName;
     unique_ptr<Expr> value;
     
-    // Para arrays
     bool isArrayAssign;
     vector<unique_ptr<Expr>> indices;
     
@@ -189,7 +167,6 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Bloque de código: { ... }
 class Block : public Stmt {
 public:
     vector<unique_ptr<Stmt>> statements;
@@ -198,18 +175,16 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// If-else
 class IfStmt : public Stmt {
 public:
     unique_ptr<Expr> condition;
     unique_ptr<Stmt> thenBranch;
-    unique_ptr<Stmt> elseBranch; // Puede ser nullptr
+    unique_ptr<Stmt> elseBranch;
     
     IfStmt(unique_ptr<Expr> condition, unique_ptr<Stmt> thenBranch, unique_ptr<Stmt> elseBranch = nullptr);
     void accept(Visitor* visitor) override;
 };
 
-// While loop
 class WhileStmt : public Stmt {
 public:
     unique_ptr<Expr> condition;
@@ -219,12 +194,11 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// For loop
 class ForStmt : public Stmt {
 public:
-    unique_ptr<Stmt> initializer; // int i = 0
-    unique_ptr<Expr> condition;   // i < 10
-    unique_ptr<Expr> increment;   // i++
+    unique_ptr<Stmt> initializer;
+    unique_ptr<Expr> condition;
+    unique_ptr<Expr> increment;
     unique_ptr<Stmt> body;
     
     ForStmt(unique_ptr<Stmt> initializer, unique_ptr<Expr> condition, 
@@ -232,16 +206,14 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Return statement
 class ReturnStmt : public Stmt {
 public:
-    unique_ptr<Expr> value; // Puede ser nullptr para void
+    unique_ptr<Expr> value;
     
     ReturnStmt(unique_ptr<Expr> value = nullptr);
     void accept(Visitor* visitor) override;
 };
 
-// Expression statement: printf(...); suma(a,b);
 class ExprStmt : public Stmt {
 public:
     unique_ptr<Expr> expression;
@@ -250,12 +222,11 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Declaración de función
 class FunctionDecl : public Stmt {
 public:
     DataType returnType;
     string name;
-    vector<pair<DataType, string>> parameters; // (tipo, nombre)
+    vector<pair<DataType, string>> parameters;
     unique_ptr<Block> body;
     
     FunctionDecl(DataType returnType, string name, 
@@ -264,20 +235,17 @@ public:
     void accept(Visitor* visitor) override;
 };
 
-// Programa completo
 class Program {
 public:
-    vector<unique_ptr<Stmt>> statements; // Funciones y declaraciones globales
+    vector<unique_ptr<Stmt>> statements;
     
     Program(vector<unique_ptr<Stmt>> statements);
 };
 
-// ========== VISITOR PATTERN ==========
 class Visitor {
 public:
     virtual ~Visitor() = default;
     
-    // Expresiones
     virtual void visitIntLiteral(IntLiteral* node) = 0;
     virtual void visitFloatLiteral(FloatLiteral* node) = 0;
     virtual void visitLongLiteral(LongLiteral* node) = 0;
@@ -291,7 +259,6 @@ public:
     virtual void visitArrayAccess(ArrayAccess* node) = 0;
     virtual void visitAssignExpr(AssignExpr* node) = 0;
     
-    // Statements
     virtual void visitVarDecl(VarDecl* node) = 0;
     virtual void visitAssignStmt(AssignStmt* node) = 0;
     virtual void visitBlock(Block* node) = 0;
