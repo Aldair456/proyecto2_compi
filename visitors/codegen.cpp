@@ -78,6 +78,8 @@ void CodeGen::emitTypeConversion(DataType from, DataType to, string reg) {
 }
 
 void CodeGen::emitFunctionProlog(string funcName, int stackSize) {
+    // Este método ya no se usa directamente, se emite en visitFunctionDecl
+    // Mantener por compatibilidad pero no debería llamarse
     emit("push rbp");
     emit("mov rbp, rsp");
     if (stackSize > 0) {
@@ -258,13 +260,18 @@ void CodeGen::visitVariable(Variable* node) {
 }
 
 void CodeGen::visitBinaryOp(BinaryOp* node) {
+    // Guardar línea original
+    int savedLine = currentSourceLine;
     // Usar la línea del token del operador
     setSourceLine(node->op.line);
+    int opLine = currentSourceLine;  // Guardar línea del operador
+    
     // Evaluar operando derecho primero
     node->right->accept(this);
     bool rightWasFloat = lastExprWasFloat;
 
-    // Guardar resultado en stack
+    // Guardar resultado en stack - usar línea del operador
+    currentSourceLine = opLine;
     if (rightWasFloat) {
         emit("sub rsp, 8");
         emit("movss [rsp], xmm0");
@@ -279,7 +286,8 @@ void CodeGen::visitBinaryOp(BinaryOp* node) {
     // Si alguno es float, la operación será float
     bool isFloatOp = leftWasFloat || rightWasFloat;
 
-    // Recuperar operando derecho
+    // Recuperar operando derecho - usar línea del operador
+    currentSourceLine = opLine;
     if (rightWasFloat) {
         emit("movss xmm1, [rsp]");
         emit("add rsp, 8");
@@ -296,7 +304,8 @@ void CodeGen::visitBinaryOp(BinaryOp* node) {
         emit("cvtsi2ss xmm0, eax");
     }
 
-    // Realizar operación
+    // Realizar operación - usar línea del operador
+    currentSourceLine = opLine;
     switch (node->op.type) {
         case TokenType::PLUS:
             if (isFloatOp) {
@@ -385,6 +394,9 @@ void CodeGen::visitBinaryOp(BinaryOp* node) {
         default:
             break;
     }
+    
+    // Restaurar línea original
+    currentSourceLine = savedLine;
 }
 
 void CodeGen::visitUnaryOp(UnaryOp* node) {
@@ -746,7 +758,8 @@ void CodeGen::visitAssignExpr(AssignExpr* node) {
 // ========== STATEMENTS ==========
 
 void CodeGen::visitVarDecl(VarDecl* node) {
-    // Usar la línea del nodo AST
+    // Guardar la línea de la declaración
+    int savedLine = currentSourceLine;
     setSourceLine(node->line);
     
     if (currentFunction.empty()) {
@@ -763,6 +776,7 @@ void CodeGen::visitVarDecl(VarDecl* node) {
             varInfo.isArray = node->isArray;
             varInfo.dimensions = node->dimensions;
             localVars[node->name] = varInfo;
+            currentSourceLine = savedLine;  // Restaurar línea
             return;  // No reservar espacio en el stack
         }
         
@@ -804,7 +818,11 @@ void CodeGen::visitVarDecl(VarDecl* node) {
 
         // Si hay inicializador
         if (node->initializer) {
+            // Guardar la línea de la declaración antes de evaluar el inicializador
+            int declLine = currentSourceLine;
             node->initializer->accept(this);
+            // Restaurar la línea de la declaración para las instrucciones de almacenamiento
+            currentSourceLine = declLine;
 
             if (node->type == DataType::FLOAT) {
                 emit("movss [rbp - " + to_string(stackOffset) + "], xmm0");
@@ -815,17 +833,25 @@ void CodeGen::visitVarDecl(VarDecl* node) {
             }
         }
     }
+    
+    // Restaurar línea original
+    currentSourceLine = savedLine;
 }
 
 void CodeGen::visitAssignStmt(AssignStmt* node) {
+    // Guardar línea original
+    int savedLine = currentSourceLine;
     // Usar la línea del nodo AST
     setSourceLine(node->line);
+    int assignLine = currentSourceLine;  // Guardar línea de la asignación
     
     if (node->isArrayAssign) {
         // Asignación a array: arr[i] = value
 
         // Evaluar valor primero
         node->value->accept(this);
+        // Restaurar línea de asignación para push
+        currentSourceLine = assignLine;
         emit("push rax");  // Guardar valor
 
         // Calcular dirección del array
@@ -834,11 +860,16 @@ void CodeGen::visitAssignStmt(AssignStmt* node) {
             varInfo = &localVars[node->varName];
         }
 
-        if (!varInfo) return;
+        if (!varInfo) {
+            currentSourceLine = savedLine;
+            return;
+        }
 
         if (node->indices.size() == 1) {
             // Array 1D
             node->indices[0]->accept(this);
+            // Restaurar línea de asignación
+            currentSourceLine = assignLine;
 
             int typeSize = 4;
             if (varInfo->type == DataType::LONG) typeSize = 8;
@@ -862,10 +893,12 @@ void CodeGen::visitAssignStmt(AssignStmt* node) {
         } else if (node->indices.size() == 2) {
             // Array 2D
             node->indices[0]->accept(this);
+            currentSourceLine = assignLine;
             emit("imul rax, " + to_string(varInfo->dimensions[1]));
             emit("push rax");
 
             node->indices[1]->accept(this);
+            currentSourceLine = assignLine;
             emit("pop rbx");
             emit("add rax, rbx");
 
@@ -892,6 +925,8 @@ void CodeGen::visitAssignStmt(AssignStmt* node) {
     } else {
         // Asignación simple: x = value
         node->value->accept(this);
+        // Restaurar línea de asignación para las instrucciones de almacenamiento
+        currentSourceLine = assignLine;
 
         if (localVars.find(node->varName) != localVars.end()) {
             VarInfo& var = localVars[node->varName];
@@ -907,6 +942,9 @@ void CodeGen::visitAssignStmt(AssignStmt* node) {
             }
         }
     }
+    
+    // Restaurar línea original
+    currentSourceLine = savedLine;
 }
 
 void CodeGen::visitBlock(Block* node) {
@@ -1101,6 +1139,8 @@ int CodeGen::calculateStackSize(FunctionDecl* node) {
     set<string> savedOptimizedVars = optimizedVars;
     stringstream savedOutput;
     savedOutput << output.str();
+    int savedSourceLine = currentSourceLine;
+    DebugGen* savedDebugGen = debugGen;  // Guardar debugGen
     
     // PRIMERO: Detectar variables optimizadas
     detectOptimizedVars(node);
@@ -1109,6 +1149,7 @@ int CodeGen::calculateStackSize(FunctionDecl* node) {
     stackOffset = 0;
     localVars.clear();
     output.str("");  // Limpiar output temporalmente
+    debugGen = nullptr;  // Deshabilitar debug durante el cálculo (no queremos registrar instrucciones temporales)
     
     // Calcular espacio para parámetros
     for (size_t i = 0; i < node->parameters.size() && i < 6; i++) {
@@ -1136,13 +1177,18 @@ int CodeGen::calculateStackSize(FunctionDecl* node) {
     optimizedVars = savedOptimizedVars;
     output.str("");
     output << savedOutput.str();
+    currentSourceLine = savedSourceLine;
+    debugGen = savedDebugGen;  // Restaurar debugGen
     
     return totalStackSize;
 }
 
 void CodeGen::visitFunctionDecl(FunctionDecl* node) {
+    // Guardar línea original
+    int savedLine = currentSourceLine;
     // Usar la línea del nodo AST
     setSourceLine(node->line);
+    int funcLine = currentSourceLine;  // Guardar línea de la función
     
     currentFunction = node->name;
     localVars.clear();
@@ -1181,10 +1227,11 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
         }
     }
 
-    // Emitir label de función
+    // Emitir label de función (sin línea específica, es metadata)
     emitLabel(node->name);
 
-    // Prólogo
+    // Prólogo - usar línea de la función
+    currentSourceLine = funcLine;
     emit("push rbp");
     emit("mov rbp, rsp");
 
@@ -1220,7 +1267,8 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
                                       false, node->line);
         }
         
-        // Guardar parámetro en stack
+        // Guardar parámetro en stack - usar línea de la función
+        currentSourceLine = funcLine;
         if (param.first == DataType::LONG) {
             emit("mov [rbp - " + to_string(varInfo.offset) + "], " + paramRegs[i]);
         } else {
@@ -1238,10 +1286,13 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
     }
 
     // Cuerpo de la función (DESPUÉS de reservar stack y guardar parámetros)
+    // El cuerpo establecerá sus propias líneas según los statements
     node->body->accept(this);
 
     // Si no hubo return explícito
     if (node->returnType == DataType::VOID) {
+        // Usar línea del final de la función (última línea del bloque)
+        currentSourceLine = funcLine;
         emitFunctionEpilog();
     }
 
@@ -1253,5 +1304,7 @@ void CodeGen::visitFunctionDecl(FunctionDecl* node) {
     }
     
     currentFunction = "";
+    // Restaurar línea original
+    currentSourceLine = savedLine;
 }
 

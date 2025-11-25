@@ -1,4 +1,0 @@
-{
-  "source": "int main() {\n    int x = 10;\n    int y = 5;\n    int sum = x + y;\n    return sum;\n}"
-}
-
